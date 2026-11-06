@@ -1,453 +1,648 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
-<title>POMODORO.EXE</title>
-<meta name="claude:viewport-fit-sides" content="cover">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&display=swap">
-<style>
-/* Layout: one full-height terminal screen on desktop; log fills the rest and scrolls. Single dark theme by choice */
-:root {
-  --bg: #000000;      /* pure black */
-  --fg: #c8c1ae;      /* warm parchment grey */
-  --hi: #f3ead2;      /* warm off-white */
-  --dim: #5f6472;     /* muted slate for secondary text */
-  --cyan: #7cc4bd;    /* soft teal for breaks */
-  --yellow: #e6b25c;  /* amber for focus and keys */
-  --green: #a3c27f;   /* sage for completion */
-  --red: #de7c6c;     /* muted coral */
-  --bar: #2c3558;     /* dusty indigo title/status bars */
-  --bar-hover: #3a4572;
-  --select-bg: #e6b25c;
-  --select-fg: #000000;
-  --border: #4a4f5e;
-  --paused-bg: rgba(44, 53, 88, 0.35);  /* faint indigo wash on the timer while paused */
-  --break-bg: rgba(124, 196, 189, 0.10); /* faint teal wash on the timer during breaks */
-  --font: "VT323", "Lucida Console", "Courier New", monospace;
-  color-scheme: dark;
-}
-html, body { height: 100%; }
-body {
-  box-sizing: border-box;
-  background: var(--bg);
-  color: var(--fg);
-  font-family: var(--font);
-  font-size: 22px;
-  line-height: 1.2;
-  padding-left: max(16px, env(safe-area-inset-left, 0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px));
-  padding-block: 16px;
-}
-.screen {
-  max-width: 50em;
-  height: 100%;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.bar {
-  background: var(--bar);
-  color: var(--hi);
-  padding: 0 8px;
-  display: flex;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 0 16px;
-}
-.dim { color: var(--dim); }
-.hi { color: var(--hi); }
-.cyan { color: var(--cyan); }
-.yellow { color: var(--yellow); }
-.green { color: var(--green); }
-.red { color: var(--red); }
-pre, .mono { font-family: var(--font); margin: 0; white-space: pre-wrap; word-break: break-word; }
+<!doctype html>
+<html lang="en">
 
-fieldset {
-  border: 2px double var(--border);
-  margin: 0;
-  padding: 6px 12px 10px;
-  min-width: 0;
-}
-legend { color: var(--hi); padding: 0 6px; }
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <style>
+    body {
+      margin: 0
+    }
 
-.presets { display: flex; flex-direction: column; gap: 4px; }
-.preset {
-  font: inherit;
-  color: var(--fg);
-  background: transparent;
-  border: 0;
-  text-align: left;
-  cursor: pointer;
-  padding: 0 4px;
-}
-.preset[aria-pressed="true"] { background: var(--select-bg); color: var(--select-fg); }
-.preset:disabled { cursor: not-allowed; opacity: .6; }
+    :root {
+      padding-top: env(safe-area-inset-top, 0px);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+      box-sizing: border-box;
+      height: 100%
+    }
+  </style>
+  <title>POMODORO.EXE</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&display=swap">
+  <style>
+    /* Layout: one full-height terminal screen on desktop; log fills the rest and scrolls. Single dark theme by choice */
+    :root {
+      --bg: #000000;
+      /* pure black */
+      --fg: #c8c1ae;
+      /* warm parchment grey */
+      --hi: #f3ead2;
+      /* warm off-white */
+      --dim: #5f6472;
+      /* muted slate for secondary text */
+      --cyan: #7cc4bd;
+      /* soft teal for breaks */
+      --yellow: #e6b25c;
+      /* amber for focus and keys */
+      --green: #a3c27f;
+      /* sage for completion */
+      --red: #de7c6c;
+      /* muted coral */
+      --bar: #2c3558;
+      /* dusty indigo title/status bars */
+      --bar-hover: #3a4572;
+      --select-bg: #e6b25c;
+      --select-fg: #000000;
+      --border: #4a4f5e;
+      --paused-bg: rgba(44, 53, 88, 0.35);
+      /* faint indigo wash on the timer while paused */
+      --break-bg: rgba(124, 196, 189, 0.10);
+      /* faint teal wash on the timer during breaks */
+      --font: "VT323", "Lucida Console", "Courier New", monospace;
+      color-scheme: dark;
+    }
 
-.clock {
-  font-size: clamp(64px, min(18vw, 17vh), 150px);
-  line-height: 1;
-  color: var(--hi);
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: .04em;
-}
-.phase { text-align: center; font-size: 28px; }
-/* paused: tint the timer box and fade its contents */
-.timerbox { transition: background-color .3s; }
-.timerbox > :not(legend) { transition: opacity .3s; }
-/* break: teal wash, teal clock and progress bar (paused rule below wins on background) */
-.timerbox.onbreak { background: var(--break-bg); border-color: var(--cyan); }
-.timerbox.onbreak .clock, .timerbox.onbreak .progress { color: var(--cyan); }
-.timerbox.paused { background: var(--paused-bg); }
-.timerbox.paused > :not(legend) { opacity: .5; }
-.progress { text-align: center; overflow: hidden; white-space: nowrap; }
-.sessions { text-align: center; letter-spacing: .2em; }
+    html,
+    body {
+      height: 100%;
+    }
 
-.cmds { display: flex; flex-wrap: wrap; gap: 8px 18px; }
-.cmd {
-  font: inherit;
-  background: transparent;
-  color: var(--fg);
-  border: 0;
-  padding: 0 4px;
-  cursor: pointer;
-}
-.cmd .k { color: var(--yellow); }
-.cmd:hover, .preset:hover:not([aria-pressed="true"]):not(:disabled) { color: var(--hi); background: var(--bar-hover); }
-button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+    body {
+      box-sizing: border-box;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--font);
+      font-size: 22px;
+      line-height: 1.2;
+      padding-left: max(16px, env(safe-area-inset-left, 0px));
+      padding-right: max(16px, env(safe-area-inset-right, 0px));
+      padding-block: 16px;
+    }
 
-/* log box takes the remaining height; only the log lines scroll */
-.logbox { flex: 1; min-height: 8em; display: flex; flex-direction: column; }
-#log {
-  flex: 1;
-  min-height: 0;
-  overflow-y: scroll;
-  padding-right: 6px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--dim) var(--bg);
-}
-#log::-webkit-scrollbar { width: 10px; }
-#log::-webkit-scrollbar-track { background: var(--bg); border-left: 1px solid var(--border); }
-#log::-webkit-scrollbar-thumb { background: var(--dim); }
-#log::-webkit-scrollbar-thumb:hover { background: var(--fg); }
-.logbox > .prompt { border-top: 1px dashed var(--border); padding-top: 4px; margin-top: 4px; }
-.cursor { animation: blink 1s steps(1) infinite; }
-@keyframes blink { 50% { opacity: 0; } }
-.flash { animation: flash .25s steps(1) 6; }
-@keyframes flash { 50% { background: var(--select-bg); color: var(--select-fg); } }
-@media (prefers-reduced-motion: reduce) {
-  .cursor, .flash { animation: none; }
-}
-@media (max-width: 480px) { body { font-size: 19px; } }
-/* phones and very short windows: let the page scroll, cap the log instead */
-@media (max-width: 700px), (max-height: 560px) {
-  .screen { height: auto; }
-  .logbox { flex: none; }
-  #log { flex: none; height: 9.6em; }
-}
-</style>
+    .screen {
+      max-width: 50em;
+      height: 100%;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
 
-<div class="screen" id="screen">
-  <div class="bar"><span>POMODORO.EXE v1.0</span><span id="sysclock">--:--</span></div>
+    .bar {
+      background: var(--bar);
+      color: var(--hi);
+      padding: 0 8px;
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0 16px;
+    }
 
-  <fieldset>
-    <legend>[ SELECT PROGRAM ]</legend>
-    <div class="presets" id="presets"></div>
-  </fieldset>
+    .dim {
+      color: var(--dim);
+    }
 
-  <fieldset id="timerBox" class="timerbox">
-    <legend>[ TIMER ]</legend>
-    <div class="phase" id="phase">READY</div>
-    <div class="clock" id="clock">30:00</div>
-    <div class="progress mono" id="progress"></div>
-    <div class="sessions mono" id="sessions"></div>
-  </fieldset>
+    .hi {
+      color: var(--hi);
+    }
 
-  <div class="cmds" id="cmds">
-    <button class="cmd" id="btnStart" type="button"><span class="k">[SPACE]</span> <span id="startLabel">START</span></button>
-    <button class="cmd" id="btnSkip" type="button"><span class="k">[S]</span> SKIP</button>
-    <button class="cmd" id="btnReset" type="button"><span class="k">[R]</span> RESET</button>
-    <button class="cmd" id="btnAuto" type="button"><span class="k">[A]</span> AUTO-NEXT: <span id="autoLabel">ON</span></button>
-    <button class="cmd" id="btnSound" type="button"><span class="k">[T]</span> TEST SOUND</button>
+    .cyan {
+      color: var(--cyan);
+    }
+
+    .yellow {
+      color: var(--yellow);
+    }
+
+    .green {
+      color: var(--green);
+    }
+
+    .red {
+      color: var(--red);
+    }
+
+    pre,
+    .mono {
+      font-family: var(--font);
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    fieldset {
+      border: 2px double var(--border);
+      margin: 0;
+      padding: 6px 12px 10px;
+      min-width: 0;
+    }
+
+    legend {
+      color: var(--hi);
+      padding: 0 6px;
+    }
+
+    .presets {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .preset {
+      font: inherit;
+      color: var(--fg);
+      background: transparent;
+      border: 0;
+      text-align: left;
+      cursor: pointer;
+      padding: 0 4px;
+    }
+
+    .preset[aria-pressed="true"] {
+      background: var(--select-bg);
+      color: var(--select-fg);
+    }
+
+    .preset:disabled {
+      cursor: not-allowed;
+      opacity: .6;
+    }
+
+    .clock {
+      font-size: clamp(64px, min(18vw, 17vh), 150px);
+      line-height: 1;
+      color: var(--hi);
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: .04em;
+    }
+
+    .phase {
+      text-align: center;
+      font-size: 28px;
+    }
+
+    /* paused: tint the timer box and fade its contents */
+    .timerbox {
+      transition: background-color .3s;
+    }
+
+    .timerbox> :not(legend) {
+      transition: opacity .3s;
+    }
+
+    /* break: teal wash, teal clock and progress bar (paused rule below wins on background) */
+    .timerbox.onbreak {
+      background: var(--break-bg);
+      border-color: var(--cyan);
+    }
+
+    .timerbox.onbreak .clock,
+    .timerbox.onbreak .progress {
+      color: var(--cyan);
+    }
+
+    .timerbox.paused {
+      background: var(--paused-bg);
+    }
+
+    .timerbox.paused> :not(legend) {
+      opacity: .5;
+    }
+
+    .progress {
+      text-align: center;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
+    .sessions {
+      text-align: center;
+      letter-spacing: .2em;
+    }
+
+    .cmds {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 18px;
+    }
+
+    .cmd {
+      font: inherit;
+      background: transparent;
+      color: var(--fg);
+      border: 0;
+      padding: 0 4px;
+      cursor: pointer;
+    }
+
+    .cmd .k {
+      color: var(--yellow);
+    }
+
+    .cmd:hover,
+    .preset:hover:not([aria-pressed="true"]):not(:disabled) {
+      color: var(--hi);
+      background: var(--bar-hover);
+    }
+
+    button:focus-visible {
+      outline: 2px solid var(--cyan);
+      outline-offset: 2px;
+    }
+
+    /* log box takes the remaining height; only the log lines scroll */
+    .logbox {
+      flex: 1;
+      min-height: 8em;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #log {
+      flex: 1;
+      min-height: 0;
+      overflow-y: scroll;
+      padding-right: 6px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--dim) var(--bg);
+    }
+
+    #log::-webkit-scrollbar {
+      width: 10px;
+    }
+
+    #log::-webkit-scrollbar-track {
+      background: var(--bg);
+      border-left: 1px solid var(--border);
+    }
+
+    #log::-webkit-scrollbar-thumb {
+      background: var(--dim);
+    }
+
+    #log::-webkit-scrollbar-thumb:hover {
+      background: var(--fg);
+    }
+
+    .logbox>.prompt {
+      border-top: 1px dashed var(--border);
+      padding-top: 4px;
+      margin-top: 4px;
+    }
+
+    .cursor {
+      animation: blink 1s steps(1) infinite;
+    }
+
+    @keyframes blink {
+      50% {
+        opacity: 0;
+      }
+    }
+
+    .flash {
+      animation: flash .25s steps(1) 6;
+    }
+
+    @keyframes flash {
+      50% {
+        background: var(--select-bg);
+        color: var(--select-fg);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+
+      .cursor,
+      .flash {
+        animation: none;
+      }
+    }
+
+    @media (max-width: 480px) {
+      body {
+        font-size: 19px;
+      }
+    }
+
+    /* phones and very short windows: let the page scroll, cap the log instead */
+    @media (max-width: 700px),
+    (max-height: 560px) {
+      .screen {
+        height: auto;
+      }
+
+      .logbox {
+        flex: none;
+      }
+
+      #log {
+        flex: none;
+        height: 9.6em;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="screen" id="screen">
+    <div class="bar"><span>POMODORO.EXE v1.0</span><span id="sysclock">--:--</span></div>
+
+    <fieldset>
+      <legend>[ SELECT PROGRAM ]</legend>
+      <div class="presets" id="presets"></div>
+    </fieldset>
+
+    <fieldset id="timerBox" class="timerbox">
+      <legend>[ TIMER ]</legend>
+      <div class="phase" id="phase">READY</div>
+      <div class="clock" id="clock">30:00</div>
+      <div class="progress mono" id="progress"></div>
+      <div class="sessions mono" id="sessions"></div>
+    </fieldset>
+
+    <div class="cmds" id="cmds">
+      <button class="cmd" id="btnStart" type="button"><span class="k">[SPACE]</span> <span
+          id="startLabel">START</span></button>
+      <button class="cmd" id="btnSkip" type="button"><span class="k">[S]</span> SKIP</button>
+      <button class="cmd" id="btnReset" type="button"><span class="k">[R]</span> RESET</button>
+      <button class="cmd" id="btnAuto" type="button"><span class="k">[A]</span> AUTO-NEXT: <span
+          id="autoLabel">ON</span></button>
+      <button class="cmd" id="btnSound" type="button"><span class="k">[T]</span> TEST SOUND</button>
+    </div>
+
+    <fieldset class="logbox">
+      <legend>[ LOG ]</legend>
+      <pre id="log" tabindex="0" aria-label="Session log"></pre>
+      <pre class="prompt">C:\&gt; <span class="cursor">_</span></pre>
+    </fieldset>
+
+    <div class="bar"><span>FOCUS TODAY: <span id="focusToday">00:00:00</span></span><span id="status">IDLE</span></div>
   </div>
 
-  <fieldset class="logbox">
-    <legend>[ LOG ]</legend>
-    <pre id="log" tabindex="0" aria-label="Session log"></pre>
-    <pre class="prompt">C:\&gt; <span class="cursor">_</span></pre>
-  </fieldset>
+  <script>
+    const PRESETS = [
+      { id: "p30", key: "1", name: "DEEP WORK", rounds: 5, focus: 30, brk: 5 },
+      { id: "p45", key: "2", name: "LONG HAUL", rounds: 4, focus: 45, brk: 10 },
+      { id: "p20", key: "3", name: "QUICKIE", rounds: 1, focus: 20, brk: 0 },
+    ];
 
-  <div class="bar"><span>FOCUS TODAY: <span id="focusToday">00:00:00</span></span><span id="status">IDLE</span></div>
-</div>
+    const $ = (id) => document.getElementById(id);
+    const state = {
+      preset: PRESETS[0],
+      round: 1,            // 1-based focus session number
+      phase: "focus",      // "focus" | "break" | "done"
+      remainingMs: PRESETS[0].focus * 60000,
+      endAt: null,         // timestamp when running
+      auto: true,
+      segStart: null,      // when the current running focus stretch began
+    };
+    let tick = null;
 
-<script>
-const PRESETS = [
-  { id: "p30", key: "1", name: "DEEP WORK", rounds: 5, focus: 30, brk: 5 },
-  { id: "p45", key: "2", name: "LONG HAUL", rounds: 4, focus: 45, brk: 10 },
-  { id: "p20", key: "3", name: "QUICKIE", rounds: 1, focus: 20, brk: 0 },
-];
-
-const $ = (id) => document.getElementById(id);
-const state = {
-  preset: PRESETS[0],
-  round: 1,            // 1-based focus session number
-  phase: "focus",      // "focus" | "break" | "done"
-  remainingMs: PRESETS[0].focus * 60000,
-  endAt: null,         // timestamp when running
-  auto: true,
-  segStart: null,      // when the current running focus stretch began
-};
-let tick = null;
-
-/* ---------- focus time tracker: today's total, kept in this browser ---------- */
-const memFocus = {};
-function todayKey() {
-  const d = new Date();
-  return `pomodoro-focus-${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
-}
-function storedFocus() {
-  const k = todayKey();
-  try {
-    const v = localStorage.getItem(k);
-    if (v !== null) return Number(v) || 0;
-  } catch (e) {}
-  return memFocus[k] || 0;
-}
-function addFocus(ms) {
-  const k = todayKey();
-  const v = storedFocus() + Math.max(0, ms);
-  memFocus[k] = v;
-  try { localStorage.setItem(k, String(v)); } catch (e) {}
-}
-// Bank the running focus stretch (on pause, skip, finish or reset)
-function creditFocus() {
-  if (state.phase === "focus" && state.segStart) addFocus(Date.now() - state.segStart);
-  state.segStart = null;
-}
-function focusTodayMs() {
-  const live = state.phase === "focus" && state.segStart ? Date.now() - state.segStart : 0;
-  return storedFocus() + live;
-}
-function fmtHMS(ms) {
-  const s = Math.floor(ms / 1000);
-  return [Math.floor(s / 3600), Math.floor(s / 60) % 60, s % 60].map((n) => String(n).padStart(2, "0")).join(":");
-}
-
-/* ---------- sound: PC-speaker style square-wave beeps ---------- */
-let audio = null;
-function ctx() {
-  if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
-  if (audio.state === "suspended") audio.resume();
-  return audio;
-}
-function beep(freq, start, dur) {
-  const a = ctx();
-  const o = a.createOscillator();
-  const g = a.createGain();
-  o.type = "square";
-  o.frequency.value = freq;
-  g.gain.setValueAtTime(0.0001, a.currentTime + start);
-  g.gain.exponentialRampToValueAtTime(0.12, a.currentTime + start + 0.01);
-  g.gain.setValueAtTime(0.12, a.currentTime + start + dur - 0.02);
-  g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + start + dur);
-  o.connect(g).connect(a.destination);
-  o.start(a.currentTime + start);
-  o.stop(a.currentTime + start + dur + 0.02);
-}
-function playTune(notes) {
-  let t = 0;
-  for (const [f, d] of notes) { if (f) beep(f, t, d); t += d + 0.04; }
-}
-// focus over -> rising "take a break"; break over -> urgent "back to work"; all done -> fanfare
-const TUNES = {
-  focusEnd: [[523, .15], [659, .15], [784, .15], [1047, .35], [0, .2], [523, .15], [659, .15], [784, .15], [1047, .35]],
-  breakEnd: [[880, .12], [0, .06], [880, .12], [0, .06], [880, .12], [0, .3], [880, .12], [0, .06], [880, .12], [0, .06], [880, .12]],
-  done: [[523, .12], [523, .12], [523, .12], [659, .4], [587, .12], [587, .12], [587, .12], [784, .4], [1047, .6]],
-};
-
-/* ---------- rendering ---------- */
-function fmt(ms) {
-  const s = Math.max(0, Math.ceil(ms / 1000));
-  return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
-}
-function phaseTotalMs() {
-  return (state.phase === "break" ? state.preset.brk : state.preset.focus) * 60000;
-}
-function currentRemaining() {
-  return state.endAt ? state.endAt - Date.now() : state.remainingMs;
-}
-function renderPresets() {
-  const box = $("presets");
-  box.innerHTML = "";
-  for (const p of PRESETS) {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "preset";
-    b.id = "preset-" + p.id;
-    b.setAttribute("aria-pressed", String(p === state.preset));
-    b.disabled = !!state.endAt;
-    const focusTotal = p.rounds * p.focus;
-    const brkText = p.brk ? `${p.brk} MIN BREAK` : "NO BREAK";
-    b.textContent = `[${p.key}] ${p.name.padEnd(10)} ${p.rounds} x ${p.focus} MIN / ${brkText}  (${Math.floor(focusTotal / 60)}H${String(focusTotal % 60).padStart(2, "0")}M)`;
-    b.addEventListener("click", () => choosePreset(p));
-    box.appendChild(b);
-  }
-}
-function render() {
-  const rem = currentRemaining();
-  const clock = $("clock");
-  const phase = $("phase");
-  if (state.phase === "done") {
-    clock.textContent = "00:00";
-    phase.innerHTML = '<span class="green">*** ALL SESSIONS COMPLETE ***</span>';
-  } else {
-    clock.textContent = fmt(rem);
-    const label = state.phase === "focus"
-      ? `<span class="yellow">FOCUS</span> ${state.round}/${state.preset.rounds}`
-      : `<span class="cyan">BREAK</span> ${state.round}/${state.preset.rounds - 1}`;
-    phase.innerHTML = label + (state.endAt ? "" : ' <span class="dim">[PAUSED]</span>');
-  }
-
-  // progress bar in block characters, width fits the screen
-  const width = Math.max(10, Math.min(40, Math.floor(($("progress").clientWidth || 400) / 12) - 6));
-  const total = phaseTotalMs();
-  const frac = state.phase === "done" ? 1 : Math.min(1, Math.max(0, 1 - rem / total));
-  const filled = Math.round(frac * width);
-  $("progress").textContent = "[" + "\u2588".repeat(filled) + "\u2591".repeat(width - filled) + "] " + String(Math.round(frac * 100)).padStart(3) + "%";
-
-  // session tracker: done = ■, current = ▶, todo = □
-  let s = "";
-  for (let i = 1; i <= state.preset.rounds; i++) {
-    if (state.phase === "done" || i < state.round || (i === state.round && state.phase === "break")) s += "\u25A0 ";
-    else if (i === state.round) s += "\u25BA ";
-    else s += "\u25A1 ";
-  }
-  $("sessions").textContent = s.trim();
-
-  $("startLabel").textContent = state.endAt ? "PAUSE" : (state.phase === "done" ? "RESTART" : "START");
-  $("autoLabel").textContent = state.auto ? "ON" : "OFF";
-  $("status").textContent = state.endAt ? "RUNNING" : (state.phase === "done" ? "DONE" : "IDLE");
-  $("focusToday").textContent = fmtHMS(focusTodayMs());
-  // paused = stopped partway through a timer (not before it starts)
-  const paused = !state.endAt && state.phase !== "done" && state.remainingMs < phaseTotalMs();
-  $("timerBox").classList.toggle("paused", paused);
-  $("timerBox").classList.toggle("onbreak", state.phase === "break");
-  if (paused) {
-    $("status").textContent = "PAUSED";
-    $("startLabel").textContent = "RESUME";
-  }
-  document.title = state.endAt ? `${fmt(rem)} ${state.phase.toUpperCase()} - POMODORO.EXE` : "POMODORO.EXE";
-}
-function log(msg) {
-  const now = new Date();
-  const t = String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0");
-  const el = $("log");
-  el.textContent += `${t}  ${msg}\n`;
-  el.scrollTop = el.scrollHeight;
-}
-
-/* ---------- timer control ---------- */
-function start() {
-  if (state.phase === "done") resetCycle();
-  ctx(); // unlock audio on user gesture
-  state.endAt = Date.now() + state.remainingMs;
-  if (state.phase === "focus") state.segStart = Date.now();
-  clearInterval(tick);
-  tick = setInterval(onTick, 250);
-  log(`${state.phase === "focus" ? "FOCUS" : "BREAK"} ${state.round} STARTED`);
-  renderPresets();
-  render();
-}
-function pause() {
-  state.remainingMs = currentRemaining();
-  creditFocus();
-  state.endAt = null;
-  clearInterval(tick);
-  log("PAUSED AT " + fmt(state.remainingMs));
-  renderPresets();
-  render();
-}
-function onTick() {
-  if (currentRemaining() <= 0) phaseFinished(true);
-  else render();
-}
-function phaseFinished(natural) {
-  clearInterval(tick);
-  creditFocus();
-  const wasRunning = !!state.endAt;
-  state.endAt = null;
-  const p = state.preset;
-  if (state.phase === "focus") {
-    log(`FOCUS ${state.round} ${natural ? "COMPLETE" : "SKIPPED"}`);
-    if (state.round >= p.rounds) {
-      state.phase = "done";
-      if (natural) playTune(TUNES.done);
-      log("ALL SESSIONS COMPLETE. GOOD WORK.");
-    } else {
-      state.phase = "break";
-      state.remainingMs = p.brk * 60000;
-      if (natural) playTune(TUNES.focusEnd);
+    /* ---------- focus time tracker: today's total, kept in this browser ---------- */
+    const memFocus = {};
+    function todayKey() {
+      const d = new Date();
+      return `pomodoro-focus-${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
     }
-  } else if (state.phase === "break") {
-    log(`BREAK ${state.round} ${natural ? "OVER" : "SKIPPED"}`);
-    state.round += 1;
-    state.phase = "focus";
-    state.remainingMs = p.focus * 60000;
-    if (natural) playTune(TUNES.breakEnd);
-  }
-  if (natural) {
-    const scr = $("clock");
-    scr.classList.remove("flash"); void scr.offsetWidth; scr.classList.add("flash");
-  }
-  renderPresets();
-  if (state.phase !== "done" && state.auto && (natural || wasRunning)) start();
-  else render();
-}
-function resetCycle() {
-  clearInterval(tick);
-  creditFocus();
-  state.round = 1;
-  state.phase = "focus";
-  state.endAt = null;
-  state.remainingMs = state.preset.focus * 60000;
-}
-function choosePreset(p) {
-  if (state.endAt) return;
-  state.preset = p;
-  resetCycle();
-  log(`PROGRAM: ${p.rounds} x ${p.focus}/${p.brk} LOADED`);
-  renderPresets();
-  render();
-}
+    function storedFocus() {
+      const k = todayKey();
+      try {
+        const v = localStorage.getItem(k);
+        if (v !== null) return Number(v) || 0;
+      } catch (e) { }
+      return memFocus[k] || 0;
+    }
+    function addFocus(ms) {
+      const k = todayKey();
+      const v = storedFocus() + Math.max(0, ms);
+      memFocus[k] = v;
+      try { localStorage.setItem(k, String(v)); } catch (e) { }
+    }
+    // Bank the running focus stretch (on pause, skip, finish or reset)
+    function creditFocus() {
+      if (state.phase === "focus" && state.segStart) addFocus(Date.now() - state.segStart);
+      state.segStart = null;
+    }
+    function focusTodayMs() {
+      const live = state.phase === "focus" && state.segStart ? Date.now() - state.segStart : 0;
+      return storedFocus() + live;
+    }
+    function fmtHMS(ms) {
+      const s = Math.floor(ms / 1000);
+      return [Math.floor(s / 3600), Math.floor(s / 60) % 60, s % 60].map((n) => String(n).padStart(2, "0")).join(":");
+    }
 
-/* ---------- input ---------- */
-$("btnStart").addEventListener("click", () => (state.endAt ? pause() : start()));
-$("btnSkip").addEventListener("click", () => { if (state.phase !== "done") phaseFinished(false); });
-$("btnReset").addEventListener("click", () => { resetCycle(); log("RESET"); renderPresets(); render(); });
-$("btnAuto").addEventListener("click", () => { state.auto = !state.auto; render(); });
-$("btnSound").addEventListener("click", () => playTune(TUNES.focusEnd));
-document.addEventListener("keydown", (e) => {
-  if (e.metaKey || e.ctrlKey || e.altKey) return;
-  const k = e.key.toLowerCase();
-  if (k === " ") { e.preventDefault(); $("btnStart").click(); }
-  else if (k === "s") $("btnSkip").click();
-  else if (k === "r") $("btnReset").click();
-  else if (k === "a") $("btnAuto").click();
-  else if (k === "t") $("btnSound").click();
-  else { const p = PRESETS.find((x) => x.key === k); if (p) choosePreset(p); }
-});
+    /* ---------- sound: PC-speaker style square-wave beeps ---------- */
+    let audio = null;
+    function ctx() {
+      if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
+      if (audio.state === "suspended") audio.resume();
+      return audio;
+    }
+    function beep(freq, start, dur) {
+      const a = ctx();
+      const o = a.createOscillator();
+      const g = a.createGain();
+      o.type = "square";
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, a.currentTime + start);
+      g.gain.exponentialRampToValueAtTime(0.12, a.currentTime + start + 0.01);
+      g.gain.setValueAtTime(0.12, a.currentTime + start + dur - 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + start + dur);
+      o.connect(g).connect(a.destination);
+      o.start(a.currentTime + start);
+      o.stop(a.currentTime + start + dur + 0.02);
+    }
+    function playTune(notes) {
+      let t = 0;
+      for (const [f, d] of notes) { if (f) beep(f, t, d); t += d + 0.04; }
+    }
+    // focus over -> rising "take a break"; break over -> urgent "back to work"; all done -> fanfare
+    const TUNES = {
+      focusEnd: [[523, .15], [659, .15], [784, .15], [1047, .35], [0, .2], [523, .15], [659, .15], [784, .15], [1047, .35]],
+      breakEnd: [[880, .12], [0, .06], [880, .12], [0, .06], [880, .12], [0, .3], [880, .12], [0, .06], [880, .12], [0, .06], [880, .12]],
+      done: [[523, .12], [523, .12], [523, .12], [659, .4], [587, .12], [587, .12], [587, .12], [784, .4], [1047, .6]],
+    };
 
-function updateSysClock() {
-  const d = new Date();
-  $("sysclock").textContent = String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
-}
-setInterval(updateSysClock, 10000);
-updateSysClock();
-window.addEventListener("resize", render);
+    /* ---------- rendering ---------- */
+    function fmt(ms) {
+      const s = Math.max(0, Math.ceil(ms / 1000));
+      return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+    }
+    function phaseTotalMs() {
+      return (state.phase === "break" ? state.preset.brk : state.preset.focus) * 60000;
+    }
+    function currentRemaining() {
+      return state.endAt ? state.endAt - Date.now() : state.remainingMs;
+    }
+    function renderPresets() {
+      const box = $("presets");
+      box.innerHTML = "";
+      for (const p of PRESETS) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "preset";
+        b.id = "preset-" + p.id;
+        b.setAttribute("aria-pressed", String(p === state.preset));
+        b.disabled = !!state.endAt;
+        const focusTotal = p.rounds * p.focus;
+        const brkText = p.brk ? `${p.brk} MIN BREAK` : "NO BREAK";
+        b.textContent = `[${p.key}] ${p.name.padEnd(10)} ${p.rounds} x ${p.focus} MIN / ${brkText}  (${Math.floor(focusTotal / 60)}H${String(focusTotal % 60).padStart(2, "0")}M)`;
+        b.addEventListener("click", () => choosePreset(p));
+        box.appendChild(b);
+      }
+    }
+    function render() {
+      const rem = currentRemaining();
+      const clock = $("clock");
+      const phase = $("phase");
+      if (state.phase === "done") {
+        clock.textContent = "00:00";
+        phase.innerHTML = '<span class="green">*** ALL SESSIONS COMPLETE ***</span>';
+      } else {
+        clock.textContent = fmt(rem);
+        const label = state.phase === "focus"
+          ? `<span class="yellow">FOCUS</span> ${state.round}/${state.preset.rounds}`
+          : `<span class="cyan">BREAK</span> ${state.round}/${state.preset.rounds - 1}`;
+        const notPaused = state.endAt || state.remainingMs >= phaseTotalMs();
+        phase.innerHTML = label + (notPaused ? "" : ' <span class="dim">[PAUSED]</span>');
+      }
 
-renderPresets();
-render();
-log("SYSTEM READY. PRESS [1], [2] OR [3], THEN [SPACE].");
-</script>
+      // progress bar in block characters, width fits the screen
+      const width = Math.max(10, Math.min(40, Math.floor(($("progress").clientWidth || 400) / 12) - 6));
+      const total = phaseTotalMs();
+      const frac = state.phase === "done" ? 1 : Math.min(1, Math.max(0, 1 - rem / total));
+      const filled = Math.round(frac * width);
+      $("progress").textContent = "[" + "\u2588".repeat(filled) + "\u2591".repeat(width - filled) + "] " + String(Math.round(frac * 100)).padStart(3) + "%";
 
-</body></html>
+      // session tracker: done = ■, current = ▶, todo = □
+      let s = "";
+      for (let i = 1; i <= state.preset.rounds; i++) {
+        if (state.phase === "done" || i < state.round || (i === state.round && state.phase === "break")) s += "\u25A0 ";
+        else if (i === state.round) s += "\u25BA ";
+        else s += "\u25A1 ";
+      }
+      $("sessions").textContent = s.trim();
+
+      $("startLabel").textContent = state.endAt ? "PAUSE" : (state.phase === "done" ? "RESTART" : "START");
+      $("autoLabel").textContent = state.auto ? "ON" : "OFF";
+      $("status").textContent = state.endAt ? "RUNNING" : (state.phase === "done" ? "DONE" : "IDLE");
+      $("focusToday").textContent = fmtHMS(focusTodayMs());
+      // paused = stopped partway through a timer (not before it starts)
+      const paused = !state.endAt && state.phase !== "done" && state.remainingMs < phaseTotalMs();
+      $("timerBox").classList.toggle("paused", paused);
+      $("timerBox").classList.toggle("onbreak", state.phase === "break");
+      if (paused) {
+        $("status").textContent = "PAUSED";
+        $("startLabel").textContent = "RESUME";
+      }
+      document.title = state.endAt ? `${fmt(rem)} ${state.phase.toUpperCase()} - POMODORO.EXE` : "POMODORO.EXE";
+    }
+    function log(msg) {
+      const now = new Date();
+      const t = String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0");
+      const el = $("log");
+      el.textContent += `${t}  ${msg}\n`;
+      el.scrollTop = el.scrollHeight;
+    }
+
+    /* ---------- timer control ---------- */
+    function start() {
+      if (state.phase === "done") resetCycle();
+      ctx(); // unlock audio on user gesture
+      state.endAt = Date.now() + state.remainingMs;
+      if (state.phase === "focus") state.segStart = Date.now();
+      clearInterval(tick);
+      tick = setInterval(onTick, 250);
+      log(`${state.phase === "focus" ? "FOCUS" : "BREAK"} ${state.round} STARTED`);
+      renderPresets();
+      render();
+    }
+    function pause() {
+      state.remainingMs = currentRemaining();
+      creditFocus();
+      state.endAt = null;
+      clearInterval(tick);
+      log("PAUSED AT " + fmt(state.remainingMs));
+      renderPresets();
+      render();
+    }
+    function onTick() {
+      if (currentRemaining() <= 0) phaseFinished(true);
+      else render();
+    }
+    function phaseFinished(natural) {
+      clearInterval(tick);
+      creditFocus();
+      const wasRunning = !!state.endAt;
+      state.endAt = null;
+      const p = state.preset;
+      if (state.phase === "focus") {
+        log(`FOCUS ${state.round} ${natural ? "COMPLETE" : "SKIPPED"}`);
+        if (state.round >= p.rounds) {
+          state.phase = "done";
+          if (natural) playTune(TUNES.done);
+          log("ALL SESSIONS COMPLETE. GOOD WORK.");
+        } else {
+          state.phase = "break";
+          state.remainingMs = p.brk * 60000;
+          if (natural) playTune(TUNES.focusEnd);
+        }
+      } else if (state.phase === "break") {
+        log(`BREAK ${state.round} ${natural ? "OVER" : "SKIPPED"}`);
+        state.round += 1;
+        state.phase = "focus";
+        state.remainingMs = p.focus * 60000;
+        if (natural) playTune(TUNES.breakEnd);
+      }
+      if (natural) {
+        const scr = $("clock");
+        scr.classList.remove("flash"); void scr.offsetWidth; scr.classList.add("flash");
+      }
+      renderPresets();
+      if (state.phase !== "done" && state.auto && (natural || wasRunning)) start();
+      else render();
+    }
+    function resetCycle() {
+      clearInterval(tick);
+      creditFocus();
+      state.round = 1;
+      state.phase = "focus";
+      state.endAt = null;
+      state.remainingMs = state.preset.focus * 60000;
+    }
+    function choosePreset(p) {
+      if (state.endAt) return;
+      state.preset = p;
+      resetCycle();
+      log(`PROGRAM: ${p.rounds} x ${p.focus}/${p.brk} LOADED`);
+      renderPresets();
+      render();
+    }
+
+    /* ---------- input ---------- */
+    $("btnStart").addEventListener("click", () => (state.endAt ? pause() : start()));
+    $("btnSkip").addEventListener("click", () => { if (state.phase !== "done") phaseFinished(false); });
+    $("btnReset").addEventListener("click", () => { resetCycle(); log("RESET"); renderPresets(); render(); });
+    $("btnAuto").addEventListener("click", () => { state.auto = !state.auto; render(); });
+    $("btnSound").addEventListener("click", () => playTune(TUNES.focusEnd));
+    document.addEventListener("keydown", (e) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const k = e.key.toLowerCase();
+      if (k === " ") { e.preventDefault(); $("btnStart").click(); }
+      else if (k === "s") $("btnSkip").click();
+      else if (k === "r") $("btnReset").click();
+      else if (k === "a") $("btnAuto").click();
+      else if (k === "t") $("btnSound").click();
+      else { const p = PRESETS.find((x) => x.key === k); if (p) choosePreset(p); }
+    });
+
+    function updateSysClock() {
+      const d = new Date();
+      $("sysclock").textContent = String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+    }
+    setInterval(updateSysClock, 10000);
+    updateSysClock();
+    window.addEventListener("resize", render);
+
+    renderPresets();
+    render();
+    log("SYSTEM READY. PRESS [1], [2] OR [3], THEN [SPACE].");
+  </script>
+</body>
+
+</html>
